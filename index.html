@@ -1,67 +1,78 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MJ Stock — Live F&O Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MJ Stock</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { background: #0a0e17; color: #f1f5f9; padding-bottom: 70px; }
-  header { background: #111827; padding: 14px 16px; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-  .logo { font-size: 19px; font-weight: 800; color: #38bdf8; letter-spacing: 0.5px; }
-  .logo span { color: #10b981; }
-  .status { font-size: 11px; background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 9px; border-radius: 20px; border: 1px solid rgba(16,185,129,0.4); font-weight: 700; display: flex; align-items: center; gap: 5px; }
-  .dot { width: 7px; height: 7px; background: #10b981; border-radius: 50%; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px; background: #0f172a; border-bottom: 1px solid #1e293b; }
-  .filters::-webkit-scrollbar { display: none; }
-  .pill { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 6px 13px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
-  .pill.active { background: #0284c7; color: #fff; border-color: #38bdf8; }
-  .container { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
-  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; position: relative; border-left: 4px solid #10b981; }
+  body { background: #0a0e17; color: #fff; font-family: sans-serif; margin: 0; padding: 12px; }
+  .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 10px; margin-bottom: 12px; }
+  .title { font-size: 20px; font-weight: bold; color: #38bdf8; }
+  .tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; }
+  .tab { background: #1e293b; color: #cbd5e1; border: none; padding: 7px 12px; border-radius: 16px; font-size: 12px; white-space: nowrap; }
+  .tab.active { background: #0284c7; color: #fff; font-weight: bold; }
+  .card { background: #111827; border-left: 4px solid #10b981; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
   .card.SELL { border-left-color: #ef4444; }
-  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .sym { font-size: 17px; font-weight: 800; color: #fff; }
-  .badge { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 6px; }
-  .badge.BUY { background: rgba(16,185,129,0.2); color: #34d399; }
-  .badge.SELL { background: rgba(239,68,68,0.2); color: #f87171; }
-  .strat-row { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 10px; }
-  .strat-tag { color: #38bdf8; font-weight: 600; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: #0a0e17; padding: 9px; border-radius: 8px; }
-  .box-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; }
-  .box-val { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-top: 2px; }
-  .empty { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
-  .sound-btn { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 10px; border-radius: 8px; font-size: 11px; cursor: pointer; }
+  .row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .sym { font-size: 17px; font-weight: bold; }
+  .tag { font-size: 12px; color: #38bdf8; }
+  .nums { display: flex; justify-content: space-between; background: #0a0e17; padding: 8px; border-radius: 6px; font-size: 12px; }
 </style>
 </head>
 <body>
-
-<header>
-  <div class="logo">MJ <span>STOCK</span></div>
-  <div style="display:flex; gap:8px; align-items:center;">
-    <button class="sound-btn" id="soundToggle" onclick="toggleSound()">🔔 Sound ON</button>
-    <div class="status"><span class="dot"></span> LIVE CLOUD</div>
-  </div>
-</header>
-
-<div class="filters" id="filterBar">
-  <button class="pill active" onclick="setFilter('ALL', this)">All Signals</button>
-  <button class="pill" onclick="setFilter('5m VWAP + 20 EMA', this)">5m VWAP + 20 EMA</button>
-  <button class="pill" onclick="setFilter('5m VWAP Cross', this)">5m VWAP Cross</button>
-  <button class="pill" onclick="setFilter('PDH/PDL', this)">PDH / PDL</button>
+<div class="top">
+  <div class="title">MJ STOCK <span style="color:#10b981">LIVE</span></div>
+  <div id="status" style="font-size:11px; color:#10b981;">● READY</div>
 </div>
-
-<div class="container" id="alertsList">
-  <div class="empty">Connecting to MJ Stock Live Scanner...</div>
+<div class="tabs">
+  <button class="tab active" onclick="filterData('ALL', this)">All</button>
+  <button class="tab" onclick="filterData('7-8D Range Breakout', this)">7-8D Range</button>
+  <button class="tab" onclick="filterData('5m VWAP + 20 EMA', this)">VWAP+EMA</button>
+  <button class="tab" onclick="filterData('5m VWAP Cross', this)">VWAP</button>
+  <button class="tab" onclick="filterData('PDH/PDL', this)">PDH/PDL</button>
 </div>
+<div id="list">Loading...</div>
 
 <script>
-  const FIREBASE_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/alerts.json";
-  let allAlerts = [];
-  let currentFilter = 'ALL';
-  let knownKeys = new Set();
-  let firstLoad = true;
-  let soundEnabled = true;
+const URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/alerts.json";
+let dataList = [];
+let activeTab = "ALL";
 
-  function toggleSound() {
-    soundEnabled = !soundEnabled;
+function filterData(t, el) {
+  activeTab = t;
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  show();
+}
+
+function show() {
+  const box = document.getElementById('list');
+  const items = activeTab === "ALL" ? dataList : dataList.filter(x => x.strategy === activeTab);
+  if (!items.length) {
+    box.innerHTML = "<p style='color:#94a3b8;text-align:center;margin-top:30px;'>Abhi koi naya signal nahi hai. Market hours (9:15 AM - 3:30 PM) mein yahan live alerts aayenge.</p>";
+    return;
+  }
+  box.innerHTML = items.map(x => `
+    <div class="card ${x.type}">
+      <div class="row"><span class="sym">${x.symbol}</span><span style="font-weight:bold;color:${x.type==='BUY'?'#34d399':'#f87171'}">${x.type} @ ₹${x.cmp}</span></div>
+      <div class="row"><span class="tag">⚡ ${x.strategy}</span><span style="font-size:11px;color:#94a3b8">${x.time}</span></div>
+      <div class="nums"><span>VWAP: ₹${x.vwap}</span><span>EMA: ₹${x.ema20}</span><span style="color:#f87171">SL: ₹${x.sl}</span></div>
+    </div>
+  `).join('');
+}
+
+async function load() {
+  try {
+    const r = await fetch(URL);
+    const d = await r.json();
+    dataList = d ? Object.values(d).filter(x => x && x.symbol).reverse() : [];
+    show();
+  } catch (e) {
+    document.getElementById('list').innerText = "Network error, retrying...";
+  }
+}
+load();
+setInterval(load, 4000);
+</script>
+</body>
+</html>
