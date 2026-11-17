@@ -1,152 +1,127 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>MJ Stock — Live F&O Scanner</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { background: #0a0e17; color: #f1f5f9; padding-bottom: 70px; }
-  header { background: #111827; padding: 14px 16px; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-  .logo { font-size: 19px; font-weight: 800; color: #38bdf8; letter-spacing: 0.5px; }
-  .logo span { color: #10b981; }
-  .status { font-size: 11px; background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 9px; border-radius: 20px; border: 1px solid rgba(16,185,129,0.4); font-weight: 700; display: flex; align-items: center; gap: 5px; }
-  .dot { width: 7px; height: 7px; background: #10b981; border-radius: 50%; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px; background: #0f172a; border-bottom: 1px solid #1e293b; }
-  .filters::-webkit-scrollbar { display: none; }
-  .pill { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 6px 13px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
-  .pill.active { background: #0284c7; color: #fff; border-color: #38bdf8; }
-  .container { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
-  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; position: relative; border-left: 4px solid #10b981; }
-  .card.SELL { border-left-color: #ef4444; }
-  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .sym { font-size: 17px; font-weight: 800; color: #fff; }
-  .badge { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 6px; }
-  .badge.BUY { background: rgba(16,185,129,0.2); color: #34d399; }
-  .badge.SELL { background: rgba(239,68,68,0.2); color: #f87171; }
-  .strat-row { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 10px; }
-  .strat-tag { color: #38bdf8; font-weight: 600; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: #0a0e17; padding: 9px; border-radius: 8px; }
-  .box-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; }
-  .box-val { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-top: 2px; }
-  .empty { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
-  .sound-btn { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 10px; border-radius: 8px; font-size: 11px; cursor: pointer; }
-</style>
-</head>
-<body>
+import yfinance as yf
+import pandas as pd
+import requests
+from datetime import datetime
 
-<header>
-  <div class="logo">MJ <span>STOCK</span></div>
-  <div style="display:flex; gap:8px; align-items:center;">
-    <button class="sound-btn" id="soundToggle" onclick="toggleSound()">🔔 Sound ON</button>
-    <div class="status"><span class="dot"></span> LIVE CLOUD</div>
-  </div>
-</header>
+FIREBASE_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/alerts.json"
 
-<div class="filters" id="filterBar">
-  <button class="pill active" onclick="setFilter('ALL', this)">All Signals</button>
-  <button class="pill" onclick="setFilter('7-8D Range Breakout', this)">7-8D Range</button>
-  <button class="pill" onclick="setFilter('5m VWAP + 20 EMA', this)">5m VWAP + 20 EMA</button>
-  <button class="pill" onclick="setFilter('5m VWAP Cross', this)">5m VWAP Cross</button>
-  <button class="pill" onclick="setFilter('PDH/PDL', this)">PDH / PDL</button>
-</div>
+FNO_STOCKS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS", "SBIN.NS",
+    "BHARTIARTL.NS", "TATAMOTORS.NS", "LT.NS", "AXISBANK.NS", "BAJFINANCE.NS",
+    "MARUTI.NS", "SUNPHARMA.NS", "TITAN.NS", "ULTRACEMCO.NS", "TATASTEEL.NS",
+    "NTPC.NS", "POWERGRID.NS", "M&M.NS", "INDUSINDBK.NS", "ADANIENT.NS",
+    "ADANIPORTS.NS", "COALINDIA.NS", "HINDALCO.NS", "VOLTAS.NS", "EICHERMOT.NS",
+    "INDUSTOWER.NS", "TRENT.NS", "BEL.NS", "HAL.NS", "POLYCAB.NS", "PERSISTENT.NS",
+    "DIXON.NS", "CHOLAFIN.NS", "BANKBARODA.NS", "PNB.NS", "CANBK.NS", "RECLTD.NS",
+    "PFC.NS", "TVSMOTOR.NS", "BAJAJ-AUTO.NS", "HEROMOTOCO.NS", "DRREDDY.NS",
+    "CIPLA.NS", "DIVISLAB.NS", "APOLLOHOSP.NS", "JSWSTEEL.NS", "GRASIM.NS",
+    "TECHM.NS", "WIPRO.NS", "HCLTECH.NS", "LTIM.NS", "TATAPOWER.NS", "DLF.NS",
+    "GODREJPROP.NS", "OBEROIRLTY.NS", "MUTHOOTFIN.NS", "SHRIRAMFIN.NS", "SBILIFE.NS",
+    "HDFCLIFE.NS", "ICICIPRULI.NS", "BAJAJFINSV.NS", "ASIANPAINT.NS", "PIDILITIND.NS",
+    "BRITANNIA.NS", "NESTLEIND.NS", "HINDUNILVR.NS", "ITC.NS", "VBL.NS", "ZOMATO.NS",
+    "JIOFIN.NS", "ABB.NS", "SIEMENS.NS", "CUMMINSIND.NS", "BHEL.NS", "IRCTC.NS",
+    "INDIGO.NS", "MOTHERSON.NS", "ASHOKLEY.NS", "BHARATFORG.NS", "ASTRAL.NS",
+    "SUPREMEIND.NS", "CROMPTON.NS", "HAVELLS.NS", "COFORGE.NS", "MPHASIS.NS",
+    "KPITTECH.NS", "LTTS.NS", "AUROPHARMA.NS", "LUPIN.NS", "BIOCON.NS", "ALKEM.NS",
+    "TORNTPHARM.NS", "ZYDUSLIFE.NS", "GLENMARK.NS", "LAURUSLABS.NS", "GRANULES.NS",
+    "FEDERALBNK.NS", "IDFCFIRSTB.NS", "AUBANK.NS", "BANDHANBNK.NS", "RBLBANK.NS",
+    "MANAPPURAM.NS", "LICHSGFIN.NS", "ABCAPITAL.NS", "M&MFIN.NS", "MFSL.NS",
+    "MCX.NS", "CDSL.NS", "BSE.NS", "ANGELONE.NS", "IEX.NS", "PETRONET.NS", "GAIL.NS",
+    "ONGC.NS", "BPCL.NS", "IOC.NS", "HINDPETRO.NS", "IGL.NS", "MGL.NS", "GUJGASLTD.NS",
+    "NATIONALUM.NS", "VEDL.NS", "SAIL.NS", "NMDC.NS", "JINDALSTEL.NS", "HINDCOPPER.NS"
+]
 
-<div class="container" id="alertsList">
-  <div class="empty">Connecting to MJ Stock Live Scanner...</div>
-</div>
+def calculate_vwap(df):
+    typical_price = (df['High'] + df['Low'] + df['Close']) / 3
+    return (typical_price * df['Volume']).cumsum() / df['Volume'].cumsum()
 
-<script>
-  const FIREBASE_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/alerts.json";
-  let allAlerts = [];
-  let currentFilter = 'ALL';
-  let knownKeys = new Set();
-  let firstLoad = true;
-  let soundEnabled = true;
+def scan_all_fno():
+    intraday = yf.download(FNO_STOCKS, period="2d", interval="5m", group_by='ticker', progress=False)
+    daily = yf.download(FNO_STOCKS, period="12d", interval="1d", group_by='ticker', progress=False)
 
-  function toggleSound() {
-    soundEnabled = !soundEnabled;
-    document.getElementById('soundToggle').innerText = soundEnabled ? "🔔 Sound ON" : "🔕 Muted";
-  }
+    for ticker in FNO_STOCKS:
+        try:
+            df = intraday[ticker].dropna().copy()
+            df_d = daily[ticker].dropna()
+            if len(df) < 25 or len(df_d) < 9:
+                continue
 
-  function playBeep() {
-    if (!soundEnabled) return;
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.15, ctx.currentTime);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.2);
-    } catch(e) {}
-  }
+            last_date = df.index[-1].date()
+            df_today = df[df.index.date == last_date].copy()
+            if len(df_today) < 3:
+                continue
 
-  function setFilter(filter, btn) {
-    currentFilter = filter;
-    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    renderAlerts();
-  }
+            df_today['VWAP'] = calculate_vwap(df_today)
+            df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+            df_today['EMA20'] = df['EMA20'].loc[df_today.index]
 
-  function renderAlerts() {
-    const list = document.getElementById('alertsList');
-    const filtered = currentFilter === 'ALL' ? allAlerts : allAlerts.filter(a => a.strategy === currentFilter);
-    if (filtered.length === 0) {
-      list.innerHTML = `<div class="empty">No alerts yet for <b>${currentFilter}</b>.<br><br>Market hours (9:15 AM - 3:30 PM) mein F&O stocks scan hote hi yahan live dikhenge.</div>`;
-      return;
-    }
-    list.innerHTML = filtered.map(a => `
-      <div class="card ${a.type}">
-        <div class="card-top">
-          <div class="sym">${a.symbol || 'STOCK'}</div>
-          <div class="badge ${a.type || 'BUY'}">${a.type || 'BUY'} @ ₹${a.cmp || '-'}</div>
-        </div>
-        <div class="strat-row">
-          <span class="strat-tag">⚡ ${a.strategy || 'Signal'}</span>
-          <span>🕒 ${a.time || ''}</span>
-        </div>
-        <div class="grid">
-          <div><div class="box-lbl">5m VWAP</div><div class="box-val">₹${a.vwap || '-'}</div></div>
-          <div><div class="box-lbl">5m 20 EMA</div><div class="box-val">₹${a.ema20 || '-'}</div></div>
-          <div><div class="box-lbl">Stop Loss</div><div class="box-val" style="color:#f87171">₹${a.sl || '-'}</div></div>
-        </div>
-      </div>
-    `).join('');
-  }
+            curr = df_today.iloc[-1]
+            prev = df_today.iloc[-2]
+            pdh = float(df_d['High'].iloc[-2])
+            pdl = float(df_d['Low'].iloc[-2])
 
-  async function fetchAlerts() {
-    try {
-      const res = await fetch(FIREBASE_URL);
-      const data = await res.json();
-      if (!data) {
-        allAlerts = [];
-        renderAlerts();
-        firstLoad = false;
-        return;
-      }
-      const keys = Object.keys(data);
-      let hasNew = false;
-      keys.forEach(k => {
-        if (!knownKeys.has(k)) {
-          knownKeys.add(k);
-          if (!firstLoad) hasNew = true;
-        }
-      });
-      // Sirf valid stock alerts dikhayein (purana undefined entry filter karein)
-      allAlerts = keys.map(k => data[k]).filter(item => item && item.symbol).reverse();
-      if (hasNew) playBeep();
-      firstLoad = false;
-      renderAlerts();
-    } catch (err) {
-      console.error(err);
-    }
-  }
+            # Pichhle 8 din ki consolidation range (aaj ko chhodkar)
+            range_days = df_d.iloc[-9:-1]
+            range_high = float(range_days['High'].max())
+            range_low = float(range_days['Low'].min())
+            range_pct = ((range_high - range_low) / range_low) * 100
 
-  fetchAlerts();
-  setInterval(fetchAlerts, 3000);
-</script>
-</body>
-</html>
+            symbol = ticker.replace(".NS", "")
+            cmp = round(float(curr['Close']), 2)
+            vwap = round(float(curr['VWAP']), 2)
+            ema20 = round(float(curr['EMA20']), 2)
+
+            signal = None
+            strategy = ""
+
+            # 1. 7-8 Day Narrow Range Breakout / Breakdown (range <= 5.5%)
+            if range_pct <= 5.5 and curr['Close'] > range_high and prev['Close'] <= range_high:
+                signal = "BUY"
+                strategy = "7-8D Range Breakout"
+            elif range_pct <= 5.5 and curr['Close'] < range_low and prev['Close'] >= range_low:
+                signal = "SELL"
+                strategy = "7-8D Range Breakout"
+            # 2. 5m VWAP + 20 EMA Cross
+            elif (curr['Close'] > curr['VWAP'] and curr['Close'] > curr['EMA20']) and not (prev['Close'] > prev['VWAP'] and prev['Close'] > prev['EMA20']):
+                signal = "BUY"
+                strategy = "5m VWAP + 20 EMA"
+            elif (curr['Close'] < curr['VWAP'] and curr['Close'] < curr['EMA20']) and not (prev['Close'] < prev['VWAP'] and prev['Close'] < prev['EMA20']):
+                signal = "SELL"
+                strategy = "5m VWAP + 20 EMA"
+            # 3. 5m VWAP Cross
+            elif curr['Close'] > curr['VWAP'] and prev['Close'] <= curr['VWAP']:
+                signal = "BUY"
+                strategy = "5m VWAP Cross"
+            elif curr['Close'] < curr['VWAP'] and prev['Close'] >= curr['VWAP']:
+                signal = "SELL"
+                strategy = "5m VWAP Cross"
+            # 4. PDH / PDL Breakout
+            elif curr['Close'] > pdh and prev['Close'] <= pdh:
+                signal = "BUY"
+                strategy = "PDH/PDL"
+            elif curr['Close'] < pdl and prev['Close'] >= pdl:
+                signal = "SELL"
+                strategy = "PDH/PDL"
+
+            if signal:
+                sl = round(cmp * 0.993, 2) if signal == "BUY" else round(cmp * 1.007, 2)
+                target = round(cmp * 1.015, 2) if signal == "BUY" else round(cmp * 0.985, 2)
+
+                alert_data = {
+                    "symbol": symbol,
+                    "type": signal,
+                    "strategy": strategy,
+                    "cmp": cmp,
+                    "vwap": vwap,
+                    "ema20": ema20,
+                    "sl": sl,
+                    "target": target,
+                    "time": curr.name.strftime("%I:%M %p")
+                }
+                requests.post(FIREBASE_URL, json=alert_data)
+        except Exception:
+            continue
+
+if __name__ == "__main__":
+    scan_all_fno()
+         
