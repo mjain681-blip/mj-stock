@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MJ Stock — Live F&O Scanner</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: #0a0e17; color: #f1f5f9; padding-bottom: 70px; }
+  header { background: #111827; padding: 14px 16px; border-bottom: 1px solid #1e293b; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 19px; font-weight: 800; color: #38bdf8; letter-spacing: 0.5px; }
+  .logo span { color: #10b981; }
+  .status { font-size: 11px; background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 9px; border-radius: 20px; border: 1px solid rgba(16,185,129,0.4); font-weight: 700; display: flex; align-items: center; gap: 5px; }
+  .dot { width: 7px; height: 7px; background: #10b981; border-radius: 50%; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding: 12px 14px; background: #0f172a; border-bottom: 1px solid #1e293b; }
+  .filters::-webkit-scrollbar { display: none; }
+  .pill { background: #1e293b; color: #94a3b8; border: 1px solid #334155; padding: 6px 13px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+  .pill.active { background: #0284c7; color: #fff; border-color: #38bdf8; }
+  .container { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 14px; position: relative; border-left: 4px solid #10b981; }
+  .card.SELL { border-left-color: #ef4444; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .sym { font-size: 17px; font-weight: 800; color: #fff; }
+  .badge { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 6px; }
+  .badge.BUY { background: rgba(16,185,129,0.2); color: #34d399; }
+  .badge.SELL { background: rgba(239,68,68,0.2); color: #f87171; }
+  .strat-row { display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 10px; }
+  .strat-tag { color: #38bdf8; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: #0a0e17; padding: 9px; border-radius: 8px; }
+  .box-lbl { font-size: 10px; color: #64748b; text-transform: uppercase; }
+  .box-val { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-top: 2px; }
+  .empty { text-align: center; padding: 40px 20px; color: #64748b; font-size: 14px; }
+  .sound-btn { background: #1e293b; color: #f8fafc; border: 1px solid #334155; padding: 5px 10px; border-radius: 8px; font-size: 11px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">MJ <span>STOCK</span></div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button class="sound-btn" id="soundToggle" onclick="toggleSound()">🔔 Sound ON</button>
+    <div class="status"><span class="dot"></span> LIVE CLOUD</div>
+  </div>
+</header>
+
+<div class="filters" id="filterBar">
+  <button class="pill active" onclick="setFilter('ALL', this)">All Signals</button>
+  <button class="pill" onclick="setFilter('5m VWAP + 20 EMA', this)">5m VWAP + 20 EMA</button>
+  <button class="pill" onclick="setFilter('5m VWAP Cross', this)">5m VWAP Cross</button>
+  <button class="pill" onclick="setFilter('PDH/PDL', this)">PDH / PDL</button>
+</div>
+
+<div class="container" id="alertsList">
+  <div class="empty">Connecting to MJ Stock Live Scanner...</div>
+</div>
+
+<script>
+  const FIREBASE_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/alerts.json";
+  let allAlerts = [];
+  let currentFilter = 'ALL';
+  let knownKeys = new Set();
+  let firstLoad = true;
+  let soundEnabled = true;
+
+  function toggleSound() {
+    soundEnabled = !soundEnabled;
+    document.getElementById('soundToggle').innerText = soundEnabled ? "🔔 Sound ON" : "🔕 Muted";
+  }
+
+  function playBeep() {
+    if (!soundEnabled) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.2);
+    } catch(e) {}
+  }
+
+  function setFilter(filter, btn) {
+    currentFilter = filter;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    renderAlerts();
+  }
+
+  function renderAlerts() {
+    const list = document.getElementById('alertsList');
+    const filtered = currentFilter === 'ALL' ? allAlerts : allAlerts.filter(a => a.strategy === currentFilter);
+    if (filtered.length === 0) {
+      list.innerHTML = `<div class="empty">No alerts yet for <b>${currentFilter}</b>.<br><br>Market hours (9:15 AM - 3:30 PM) mein F&O stocks scan hote hi yahan live dikhenge.</div>`;
+      return;
+    }
+    list.innerHTML = filtered.map(a => `
+      <div class="card ${a.type}">
+        <div class="card-top">
+          <div class="sym">${a.symbol}</div>
+          <div class="badge ${a.type}">${a.type} @ ₹${a.cmp}</div>
+        </div>
+        <div class="strat-row">
+          <span class="strat-tag">⚡ ${a.strategy}</span>
+          <span>🕒 ${a.time || ''}</span>
+        </div>
+        <div class="grid">
+          <div><div class="box-lbl">5m VWAP</div><div class="box-val">₹${a.vwap || '-'}</div></div>
+          <div><div class="box-lbl">5m 20 EMA</div><div class="box-val">₹${a.ema20 || '-'}</div></div>
+          <div><div class="box-lbl">Stop Loss</div><div class="box-val" style="color:#f87171">₹${a.sl}</div></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function fetchAlerts() {
+    try {
+      const res = await fetch(FIREBASE_URL);
+      const data = await res.json();
+      if (!data) {
+        allAlerts = [];
+        renderAlerts();
+        firstLoad = false;
+        return;
+      }
+      const keys = Object.keys(data);
+      let hasNew = false;
+      keys.forEach(k => {
+        if (!knownKeys.has(k)) {
+          knownKeys.add(k);
+          if (!firstLoad) hasNew = true;
+        }
+      });
+      allAlerts = keys.map(k => data[k]).reverse();
+      if (hasNew) playBeep();
+      firstLoad = false;
+      renderAlerts();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  fetchAlerts();
+  setInterval(fetchAlerts, 3000);
+</script>
+</body>
+</html>
