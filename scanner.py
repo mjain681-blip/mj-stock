@@ -49,7 +49,7 @@ to_date_intra = (now_ist + timedelta(days=1)).strftime("%Y-%m-%d")
 print(f"Starting Dhan 0-Second Live Scan at {today_str} {time_str} IST...")
 
 if not CLIENT_ID or not ACCESS_TOKEN:
-    print("ERROR: DHAN_CLIENT_ID or DHAN_ACCESS_TOKEN missing in GitHub Secrets!")
+    print("ERROR: DHAN_CLIENT_ID or DHAN_ACCESS_TOKEN missing!")
     exit(1)
 
 # 1. Fetch Dhan Security IDs for NSE Equity
@@ -73,16 +73,6 @@ headers = {
     "Content-Type": "application/json"
 }
 
-existing_keys = set()
-try:
-    r = requests.get(FIREBASE_URL, timeout=10)
-    if r.status_code == 200 and r.json():
-        for k, v in r.json().items():
-            if isinstance(v, dict) and v.get("date") == today_str:
-                existing_keys.add(f"{v.get('symbol')}_{v.get('strategy')}_{v.get('type')}")
-except Exception as e:
-    print("Firebase GET error:", e)
-
 signals = []
 
 for sym, sec_id in sec_map.items():
@@ -99,8 +89,8 @@ for sym, sec_id in sec_map.items():
         d_res = requests.post("https://api.dhan.co/v2/charts/historical", headers=headers, json=d_payload, timeout=8)
         if d_res.status_code != 200:
             if d_res.status_code == 401:
-                print("Dhan Token Expired or Invalid (401)! Please generate a fresh token.")
-                break
+                print("CRITICAL ERROR: Dhan Token Invalid or Expired (401)!")
+                exit(1)
             continue
         d_json = d_res.json()
         if not d_json.get("high") or len(d_json["high"]) < 8:
@@ -189,12 +179,12 @@ for sym, sec_id in sec_map.items():
 
 print(f"Total 0-Second Dhan signals found: {len(signals)}")
 
+# Purane Yahoo/Old signals ko saaf karein aur sirf fresh Dhan signals dikhayein
+requests.delete(FIREBASE_URL, timeout=10)
+
 pushed = 0
 for s in signals:
     sym_name, strat, sig_type, cmp, vwap_v, ema_v, sl_v = s
-    unique_id = f"{sym_name}_{strat}_{sig_type}"
-    if unique_id in existing_keys:
-        continue
     payload = {
         "symbol": sym_name,
         "strategy": strat,
@@ -210,4 +200,5 @@ for s in signals:
     if res.status_code == 200:
         pushed += 1
 
-print(f"Done! Pushed {pushed} real-time alerts to MJ Stock.")
+print(f"Done! Cleared old data & pushed {pushed} fresh Dhan live alerts.")
+    
