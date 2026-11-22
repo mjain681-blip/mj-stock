@@ -17,9 +17,11 @@
     .tab-btn { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
     .tab-btn.active { background: #0284c7; color: #ffffff; border-color: #38bdf8; }
     .badge { float: right; background: rgba(0,0,0,0.3); padding: 2px 7px; border-radius: 999px; font-size: 11px; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .card { display: block; text-decoration: none; color: inherit; background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-bottom: 10px; transition: border-color 0.15s; }
+    .card:active { border-color: #38bdf8; background: #162032; }
     .row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .sym { font-size: 16px; font-weight: 700; color: #f8fafc; }
+    .chart-tag { font-size: 11px; color: #38bdf8; background: rgba(56, 189, 248, 0.12); padding: 2px 6px; border-radius: 5px; margin-left: 6px; font-weight: 600; }
     .price { font-size: 15px; font-weight: 700; }
     .up { color: #4ade80; }
     .down { color: #f87171; }
@@ -127,10 +129,12 @@
       list.innerHTML = items.map(st => {
         const pctCls = st.pct >= 0 ? "up" : "down";
         const sign = st.pct >= 0 ? "+" : "";
+        const tvSym = encodeURIComponent("NSE:" + st.symbol.replace(/&/g, "_"));
+        const tvUrl = `https://www.tradingview.com/chart/?symbol=${tvSym}`;
         return `
-          <div class="card">
+          <a class="card" href="${tvUrl}" target="_blank" rel="noopener noreferrer">
             <div class="row-top">
-              <span class="sym">${st.symbol}</span>
+              <div><span class="sym">${st.symbol}</span><span class="chart-tag">Chart ↗</span></div>
               <span class="price ${pctCls}">₹${st.close} (${sign}${st.pct}%)</span>
             </div>
             <div class="levels">
@@ -138,7 +142,7 @@
               <span><b>PDL:</b> ₹${st.pdl}</span>
               <span><b>Vol:</b> ${(st.vol / 100000).toFixed(2)}L</span>
             </div>
-          </div>`;
+          </a>`;
       }).join("");
     }
 
