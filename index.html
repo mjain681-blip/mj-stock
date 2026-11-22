@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MJ Stock — EOD F&O Scanners</title>
+  <meta name="theme-color" content="#0f172a" />
+  <title>MJ Stock</title>
+  <link id="app-icon" rel="icon" type="image/png" />
+  <link id="apple-icon" rel="apple-touch-icon" />
+  <link id="app-manifest" rel="manifest" />
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 12px; }
     .header { background: #1e293b; padding: 14px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #334155; }
@@ -33,6 +37,62 @@
   <div id="stockList"></div>
 
   <script>
+    // Custom MJ Stock App Icon + PWA Manifest Generator
+    (function setupAppIcon() {
+      const c = document.createElement("canvas");
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext("2d");
+
+      const grad = ctx.createLinearGradient(0, 0, 512, 512);
+      grad.addColorStop(0, "#0284c7");
+      grad.addColorStop(1, "#0f172a");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Bullish green trend line
+      ctx.strokeStyle = "#4ade80";
+      ctx.lineWidth = 22;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(85, 385);
+      ctx.lineTo(195, 325);
+      ctx.lineTo(280, 355);
+      ctx.lineTo(425, 225);
+      ctx.stroke();
+
+      // Arrow tip
+      ctx.fillStyle = "#4ade80";
+      ctx.beginPath();
+      ctx.moveTo(435, 215);
+      ctx.lineTo(380, 220);
+      ctx.lineTo(422, 268);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bold MJ letters
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "900 175px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("MJ", 256, 215);
+
+      const iconData = c.toDataURL("image/png");
+      document.getElementById("app-icon").href = iconData;
+      document.getElementById("apple-icon").href = iconData;
+
+      const manifest = {
+        name: "MJ Stock",
+        short_name: "MJ Stock",
+        start_url: "https://mjain681-blip.github.io/mj-stock/",
+        display: "standalone",
+        background_color: "#0f172a",
+        theme_color: "#0f172a",
+        icons: [{ src: iconData, sizes: "512x512", type: "image/png" }]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: "application/json" });
+      document.getElementById("app-manifest").href = URL.createObjectURL(blob);
+    })();
+
     const DB_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/mj_eod_scanners.json";
     const SCANNERS = [
       { key: "s1_200ema_squeeze_up", label: "1. 200EMA Squeeze Up" },
