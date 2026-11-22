@@ -37,7 +37,6 @@
   <div id="stockList"></div>
 
   <script>
-    // Custom MJ Stock App Icon + PWA Manifest Generator
     (function setupAppIcon() {
       const c = document.createElement("canvas");
       c.width = 512; c.height = 512;
@@ -49,7 +48,6 @@
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 512, 512);
 
-      // Bullish green trend line
       ctx.strokeStyle = "#4ade80";
       ctx.lineWidth = 22;
       ctx.lineCap = "round";
@@ -61,7 +59,6 @@
       ctx.lineTo(425, 225);
       ctx.stroke();
 
-      // Arrow tip
       ctx.fillStyle = "#4ade80";
       ctx.beginPath();
       ctx.moveTo(435, 215);
@@ -70,7 +67,6 @@
       ctx.closePath();
       ctx.fill();
 
-      // Bold MJ letters
       ctx.fillStyle = "#ffffff";
       ctx.font = "900 175px system-ui, sans-serif";
       ctx.textAlign = "center";
