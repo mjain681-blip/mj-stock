@@ -1,4 +1,3 @@
-import time
 import requests
 import pandas as pd
 import numpy as np
@@ -7,32 +6,42 @@ from datetime import datetime, timezone, timedelta
 
 FIREBASE_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/mj_eod_scanners.json"
 
-# NSE F&O स्टॉक्स की लिस्ट (100% फ्री NSE या fallback से)
-def get_fno_symbols():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        session = requests.Session()
-        session.get("https://www.nseindia.com", headers=headers, timeout=10)
-        res = session.get("https://www.nseindia.com/api/equity-stockIndices?index=SECURITIES%20IN%20F%26O", headers=headers, timeout=10)
-        if res.status_code == 200:
-            data = res.json().get("data", [])
-            syms = [item["symbol"] for item in data if item.get("symbol") and "NIFTY" not in item["symbol"]]
-            if len(syms) > 100:
-                return sorted(list(set(syms)))
-    except Exception as e:
-        print("NSE direct fetch fallback:", e)
-
-    # बैकअप F&O लिस्ट (अगर NSE API ब्लॉक करे)
-    url = "https://archives.nseindia.com/content/fo/fo_mktlots.csv"
-    try:
-        df = pd.read_csv(url)
-        col = [c for c in df.columns if "SYMBOL" in c.upper()][0]
-        syms = [str(s).strip() for s in df[col].dropna() if "NIFTY" not in str(s).upper() and str(s).strip().isalpha()]
-        if len(syms) > 100:
-            return sorted(list(set(syms)))
-    except Exception as e:
-        print("CSV fallback error:", e)
-    return []
+# पूरी NSE F&O स्टॉक्स लिस्ट (सीधे कोड में — कभी ब्लॉक नहीं होगी)
+FNO_SYMBOLS = [
+    "360ONE", "ABB", "ABCAPITAL", "ABFRL", "ACC", "ADANIENSOL", "ADANIENT", "ADANIGREEN",
+    "ADANIPORTS", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP",
+    "APOLLOTYRE", "ASHOKLEY", "ASIANPAINT", "ASTRAL", "ATGL", "AUBANK", "AUROPHARMA",
+    "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJFINANCE", "BALKRISIND", "BANDHANBNK",
+    "BANKBARODA", "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL",
+    "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", "BRITANNIA", "BSE", "BSOFT",
+    "CAMS", "CANBK", "CANFINHOME", "CDSL", "CESC", "CGPOWER", "CHAMBLFERT",
+    "CHOLAFIN", "CIPLA", "COALINDIA", "COFORGE", "COLPAL", "CONCOR", "CROMPTON",
+    "CUMMINSIND", "CYIENT", "DABUR", "DALBHARAT", "DEEPAKNTR", "DELHIVERY", "DIVISLAB",
+    "DIXON", "DLF", "DMART", "DRREDDY", "EICHERMOT", "ESCORTS", "ETERNAL",
+    "EXIDEIND", "FEDERALBNK", "FORTIS", "GAIL", "GLENMARK", "GMRAIRPORT", "GODREJCP",
+    "GODREJPROP", "GRANULES", "GRASIM", "HAL", "HAVELLS", "HCLTECH", "HDFCAMC",
+    "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HFCL", "HINDALCO", "HINDCOPPER", "HINDPETRO",
+    "HINDUNILVR", "HUDCO", "ICICIBANK", "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB",
+    "IEX", "IGL", "IIFL", "INDHOTEL", "INDIACEM", "INDIAMART", "INDIANB",
+    "INDIGO", "INDUSINDBK", "INDUSTOWER", "INFY", "INOXWIND", "IOC", "IPCALAB",
+    "IRCTC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JKCEMENT",
+    "JSL", "JSWENERGY", "JSWSTEEL", "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI",
+    "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", "LODHA",
+    "LT", "LTF", "LTIM", "LTTS", "LUPIN", "M&M", "M&MFIN",
+    "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", "MAXHEALTH", "MAZDOCK", "MCX",
+    "METROPOLIS", "MFSL", "MGL", "MOTHERSON", "MPHASIS", "MRF", "MUTHOOTFIN",
+    "NATIONALUM", "NAUKRI", "NBCC", "NCC", "NESTLEIND", "NHPC", "NMDC",
+    "NTPC", "NYKAA", "OBEROIRLTY", "OFSS", "OIL", "ONGC", "PAGEIND",
+    "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD",
+    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POONAWALLA",
+    "POWERGRID", "POWERINDIA", "PRESTIGE", "RBLBANK", "RECLTD", "RELIANCE", "RVNL",
+    "SAIL", "SBICARD", "SBILIFE", "SBIN", "SHREECEM", "SHRIRAMFIN", "SIEMENS",
+    "SJVN", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SYNGENE",
+    "TATACHEM", "TATACOMM", "TATACONSUM", "TATAELXSI", "TATAMOTORS", "TATAPOWER", "TATASTEEL",
+    "TATATECH", "TCS", "TECHM", "TIINDIA", "TITAGARH", "TITAN", "TORNTPHARM",
+    "TORNTPOWER", "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA",
+    "UPL", "VBL", "VEDL", "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
+]
 
 def calc_rsi(series, period=14):
     delta = series.diff()
@@ -53,14 +62,10 @@ def main():
     now_ist = datetime.now(ist)
     print(f"Running MJ EOD Scanner at {now_ist.strftime('%d-%b-%Y %I:%M %p IST')}")
 
-    symbols = get_fno_symbols()
-    print(f"Total F&O symbols loaded: {len(symbols)}")
-    if not symbols:
-        return
-
+    symbols = sorted(list(set(FNO_SYMBOLS)))
     tickers = [f"{s}.NS" for s in symbols]
 
-    # 1. डेली डेटा एक साथ डाउनलोड (260 दिन ताकि 200 EMA सटीक निकले)
+    # 1. डेली डेटा डाउनलोड (1 साल का ताकि 200 EMA सटीक निकले)
     daily_raw = yf.download(tickers, period="1y", interval="1d", group_by="ticker", threads=True, progress=False)
 
     # 2. इंट्राडे 1-Hour डेटा (आख़िरी 1:30 PM - 3:30 PM 2-Hour कैंडल के लिए)
@@ -93,7 +98,6 @@ def main():
         if latest_candle_date is None:
             latest_candle_date = last_date_str
 
-        # इंडिकेटर्स
         df["ema20"] = df["Close"].ewm(span=20, adjust=False).mean()
         df["ema50"] = df["Close"].ewm(span=50, adjust=False).mean()
         df["ema200"] = df["Close"].ewm(span=200, adjust=False).mean()
@@ -182,7 +186,6 @@ def main():
                 else:
                     idf.index = idf.index.tz_convert(ist)
 
-                # हर दिन को 2-घंटे के सेशन में बांटें: (9:15-11:15), (11:15-13:15), (13:15-15:30 आख़िरी 2 घंटे)
                 idf["date"] = idf.index.date
                 idf["hour"] = idf.index.hour
                 idf["slot"] = np.where(idf["hour"] < 11, 1, np.where(idf["hour"] < 13, 2, 3))
@@ -196,16 +199,15 @@ def main():
                 if len(df_2h) >= 16:
                     df_2h["atr14"] = calc_atr(df_2h, 14)
                     last_2h = df_2h.iloc[-1]
-                    # कन्फर्म करें कि आख़िरी बार दिन का slot 3 (1:30 PM - 3:30 PM) ही है
                     if last_2h["slot"] == 3 and (last_2h["High"] - last_2h["Low"]) < (last_2h["atr14"] * 0.40):
                         results["s6_two_hour_close"].append(item)
         except Exception:
             pass
 
     results["market_date"] = latest_candle_date or ""
-    requests.put(FIREBASE_URL, json=results)
-    print("Firebase updated successfully for date:", results["market_date"])
+    res = requests.put(FIREBASE_URL, json=results)
+    print("Firebase status:", res.status_code, "| Date:", results["market_date"])
+    print("Counts:", {k: len(v) for k, v in results.items() if isinstance(v, list)})
 
 if __name__ == "__main__":
     main()
-    
