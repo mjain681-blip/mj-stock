@@ -1,78 +1,103 @@
 <!DOCTYPE html>
-<html>
+<html lang="hi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MJ Stock</title>
-<style>
-  body { background: #0a0e17; color: #fff; font-family: sans-serif; margin: 0; padding: 12px; }
-  .top { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; padding-bottom: 10px; margin-bottom: 12px; }
-  .title { font-size: 20px; font-weight: bold; color: #38bdf8; }
-  .tabs { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; }
-  .tab { background: #1e293b; color: #cbd5e1; border: none; padding: 7px 12px; border-radius: 16px; font-size: 12px; white-space: nowrap; }
-  .tab.active { background: #0284c7; color: #fff; font-weight: bold; }
-  .card { background: #111827; border-left: 4px solid #10b981; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-  .card.SELL { border-left-color: #ef4444; }
-  .row { display: flex; justify-content: space-between; margin-bottom: 6px; }
-  .sym { font-size: 17px; font-weight: bold; }
-  .tag { font-size: 12px; color: #38bdf8; }
-  .nums { display: flex; justify-content: space-between; background: #0a0e17; padding: 8px; border-radius: 6px; font-size: 12px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MJ Stock — EOD F&O Scanners</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 12px; }
+    .header { background: #1e293b; padding: 14px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #334155; }
+    .header h1 { margin: 0 0 6px 0; font-size: 20px; color: #38bdf8; }
+    .meta { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+    .tabs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+    .tab-btn { background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; text-align: left; cursor: pointer; }
+    .tab-btn.active { background: #0284c7; color: #ffffff; border-color: #38bdf8; }
+    .badge { float: right; background: rgba(0,0,0,0.3); padding: 2px 7px; border-radius: 999px; font-size: 11px; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .sym { font-size: 16px; font-weight: 700; color: #f8fafc; }
+    .price { font-size: 15px; font-weight: 700; }
+    .up { color: #4ade80; }
+    .down { color: #f87171; }
+    .levels { display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; background: #0f172a; padding: 7px 10px; border-radius: 6px; }
+    .empty { text-align: center; color: #94a3b8; padding: 30px 10px; font-size: 14px; }
+  </style>
 </head>
 <body>
-<div class="top">
-  <div class="title">MJ STOCK <span style="color:#10b981">LIVE</span></div>
-  <div id="status" style="font-size:11px; color:#10b981;">● READY</div>
-</div>
-<div class="tabs">
-  <button class="tab active" onclick="filterData('ALL', this)">All</button>
-  <button class="tab" onclick="filterData('7-8D Range Breakout', this)">7-8D Range</button>
-  <button class="tab" onclick="filterData('5m VWAP + 20 EMA', this)">VWAP+EMA</button>
-  <button class="tab" onclick="filterData('5m VWAP Cross', this)">VWAP</button>
-  <button class="tab" onclick="filterData('PDH/PDL', this)">PDH/PDL</button>
-</div>
-<div id="list">Loading...</div>
+  <div class="header">
+    <h1>MJ Stock — EOD Scanners</h1>
+    <div class="meta" id="metaInfo">डेटा लोड हो रहा है...</div>
+  </div>
 
-<script>
-const URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/alerts.json";
-let dataList = [];
-let activeTab = "ALL";
+  <div class="tabs" id="tabBar"></div>
+  <div id="stockList"></div>
 
-function filterData(t, el) {
-  activeTab = t;
-  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  show();
-}
+  <script>
+    const DB_URL = "https://mj-stock-15f1b-default-rtdb.asia-southeast1.firebasedatabase.app/mj_eod_scanners.json";
+    const SCANNERS = [
+      { key: "s1_200ema_squeeze_up", label: "1. 200EMA Squeeze Up" },
+      { key: "s2_200ema_breakdown", label: "2. 200EMA Breakdown" },
+      { key: "s3_next_day_squeeze", label: "3. Next-Day Squeeze" },
+      { key: "s4_consolidation_7d", label: "4. 7D Consolidation (4%)" },
+      { key: "s5_7days_range_bound", label: "5. 7D Range Bound" },
+      { key: "s6_two_hour_close", label: "6. 2Hr Close (1:30-3:30)" }
+    ];
 
-function show() {
-  const box = document.getElementById('list');
-  const items = activeTab === "ALL" ? dataList : dataList.filter(x => x.strategy === activeTab);
-  if (!items.length) {
-    box.innerHTML = "<p style='color:#94a3b8;text-align:center;margin-top:30px;'>Abhi koi naya signal nahi hai. Market hours (9:15 AM - 3:30 PM) mein yahan live alerts aayenge.</p>";
-    return;
-  }
-  box.innerHTML = items.map(x => `
-    <div class="card ${x.type}">
-      <div class="row"><span class="sym">${x.symbol}</span><span style="font-weight:bold;color:${x.type==='BUY'?'#34d399':'#f87171'}">${x.type} @ ₹${x.cmp}</span></div>
-      <div class="row"><span class="tag">⚡ ${x.strategy}</span><span style="font-size:11px;color:#94a3b8">${x.time}</span></div>
-      <div class="nums"><span>VWAP: ₹${x.vwap}</span><span>EMA: ₹${x.ema20}</span><span style="color:#f87171">SL: ₹${x.sl}</span></div>
-    </div>
-  `).join('');
-}
+    let appData = {};
+    let activeKey = SCANNERS[0].key;
 
-async function load() {
-  try {
-    const r = await fetch(URL);
-    const d = await r.json();
-    dataList = d ? Object.values(d).filter(x => x && x.symbol).reverse() : [];
-    show();
-  } catch (e) {
-    document.getElementById('list').innerText = "Network error, retrying...";
-  }
-}
-load();
-setInterval(load, 4000);
-</script>
+    function renderTabs() {
+      const bar = document.getElementById("tabBar");
+      bar.innerHTML = SCANNERS.map(s => {
+        const count = (appData[s.key] || []).length;
+        const cls = s.key === activeKey ? "tab-btn active" : "tab-btn";
+        return `<button class="${cls}" onclick="selectTab('${s.key}')">${s.label}<span class="badge">${count}</span></button>`;
+      }).join("");
+    }
+
+    function selectTab(key) {
+      activeKey = key;
+      renderTabs();
+      renderStocks();
+    }
+
+    function renderStocks() {
+      const list = document.getElementById("stockList");
+      const items = appData[activeKey] || [];
+      if (!items.length) {
+        list.innerHTML = `<div class="empty">इस स्कैनर में आज कोई स्टॉक नहीं आया है।</div>`;
+        return;
+      }
+      list.innerHTML = items.map(st => {
+        const pctCls = st.pct >= 0 ? "up" : "down";
+        const sign = st.pct >= 0 ? "+" : "";
+        return `
+          <div class="card">
+            <div class="row-top">
+              <span class="sym">${st.symbol}</span>
+              <span class="price ${pctCls}">₹${st.close} (${sign}${st.pct}%)</span>
+            </div>
+            <div class="levels">
+              <span><b>PDH:</b> ₹${st.pdh}</span>
+              <span><b>PDL:</b> ₹${st.pdl}</span>
+              <span><b>Vol:</b> ${(st.vol / 100000).toFixed(2)}L</span>
+            </div>
+          </div>`;
+      }).join("");
+    }
+
+    fetch(DB_URL)
+      .then(r => r.json())
+      .then(data => {
+        appData = data || {};
+        document.getElementById("metaInfo").innerHTML =
+          `मार्केट डेटा तारीख़: <b>${appData.market_date || "-"}</b><br>आख़िरी अपडेट: ${appData.updated_at || "-"}`;
+        renderTabs();
+        renderStocks();
+      })
+      .catch(() => {
+        document.getElementById("metaInfo").innerText = "डेटा लोड करने में समस्या आई, पेज रीफ़्रेश करें।";
+      });
+  </script>
 </body>
 </html>
