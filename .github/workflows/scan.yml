@@ -3,7 +3,8 @@ name: MJ Stock EOD Scanner
 on:
   schedule:
     # रोज़ सोमवार से शुक्रवार शाम 6:15 PM IST (12:45 UTC) पर चलेगा
-    - cron: '45 12 * * 1-5'
+    - cron: '38 11 * * 1-5'
+
   workflow_dispatch: # मोबाइल से कभी भी "Run workflow" दबाकर चलाने के लिए
 
 jobs:
